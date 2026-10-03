@@ -1,0 +1,5 @@
+FROM ghcr.io/cyber-dojo-languages/cobol:ab5b018
+LABEL maintainer=jon@jaggersoft.com
+
+COPY install.sh config.properties compile_and_run_test_program.sh ./
+RUN ./install.sh && rm ./install.sh
