@@ -1,4 +1,4 @@
-FROM ghcr.io/cyber-dojo-languages/cobol:ab5b018
+FROM ghcr.io/cyber-dojo-languages/cobol:393b165
 LABEL maintainer=jon@jaggersoft.com
 
 COPY install.sh config.properties compile_and_run_test_program.sh ./

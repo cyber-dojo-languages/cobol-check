@@ -4,12 +4,26 @@
 # merges them into one test program, and has cobc compile and run that. So the
 # image needs a JRE beside the GnuCOBOL the base image provides.
 
-readonly GNUCOBOL_VERSION=$(sed --quiet 's/.*"gnucobol":"\([0-9.]*\)".*/\1/p' /versions.json)
-
-if [ -z "${GNUCOBOL_VERSION}" ]; then
-  echo '/versions.json has no gnucobol property' >&2
-  exit 1
-fi
+# Appends one test framework to the test_frameworks list the base image
+# wrote in /versions.json, keeping any entry an earlier image added. Stops
+# the build if the list is not found, rather than record nothing. Short grep
+# flags because busybox grep has no long ones.
+add_test_framework()
+{
+  name="${1}"
+  version="${2}"
+  entry="{\"name\": \"${name}\", \"version\": \"${version}\"}"
+  if grep -q '"test_frameworks": \[\]' /versions.json; then
+    sed -i "s|\"test_frameworks\": \[\]|\"test_frameworks\": [${entry}]|" /versions.json
+  else
+    sed -i "/\"test_frameworks\": \[/s|}\]|}, ${entry}]|" /versions.json
+  fi
+  if ! grep -q -F "${entry}" /versions.json; then
+    echo "Could not add ${name} to /versions.json" >&2
+    cat /versions.json >&2
+    exit 1
+  fi
+}
 
 apk update
 
@@ -65,10 +79,9 @@ mv compile_and_run_test_program.sh /opt/cobol-check/scripts/compile_and_run_test
 chmod 0644 /opt/cobol-check/cobol-check.jar /opt/cobol-check/config.properties
 chmod 0755 /opt/cobol-check/scripts/compile_and_run_test_program.sh
 
-# Read by check_version.sh. Each tool is asked rather than an index, so the
-# numbers recorded are ones the image can run, and running cobol-check here
-# also proves the jar starts under this JRE before any kata does.
-readonly JAVA_VERSION=$(java -version 2>&1 | sed --quiet '1s/.*version "\([0-9][0-9.]*\)".*/\1/p')
+# cobol-check is asked rather than an index, so the number recorded is one
+# the image can run, and running it here also proves the jar starts under
+# this JRE before any kata does.
 readonly RAN_VERSION=$(java -jar /opt/cobol-check/cobol-check.jar --version 2>&1 \
   | sed --quiet 's/.*[Vv]ersion \([0-9][0-9.]*[0-9]\).*/\1/p' | head -n 1)
 
@@ -77,6 +90,7 @@ if [ "${RAN_VERSION}" != "${COBOL_CHECK_VERSION}" ]; then
   exit 1
 fi
 
-echo "{\"gnucobol\":\"${GNUCOBOL_VERSION}\",\"java\":\"${JAVA_VERSION}\",\"cobol_check\":\"${COBOL_CHECK_VERSION}\"}" > /versions.json
+add_test_framework cobol-check "${COBOL_CHECK_VERSION}"
+cat /versions.json
 
 rm -rf /var/cache/apk/*
